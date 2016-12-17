@@ -1,0 +1,276 @@
+---
+title: "Totvs Challenge"
+author: "Rui Romanini"
+date: "17 de dezembro de 2016"
+output: pdf_document
+---
+
+##Objective
+
+The objective of this challenge is using the given dataset of transactions (notas fiscais eletrônicas) from a restaurant:
+
+1. Parse and extract the data.
+
+2. Identify a pattern on any set of fields that can help predict how much a customer will spend.
+
+3. Calculate a sales forecast for the next week.
+
+##The environment
+It's important to pay atention to the environment, to make sure about reproducibility. 
+
+This code was produced using R version 3.3.1 and R Studio version 0.99.489
+
+The Operational System it's Windows 10 Home
+
+
+```{r}
+
+if(!require(jsonlite)){
+  install.packages("jsonlite", repos ="http://cran.us.r-project.org")
+  library(jsonlite)
+}
+
+if(!require(plyr)){
+  install.packages("plyr", repos ="http://cran.us.r-project.org")
+  library(plyr)
+}
+
+
+if(!require(lubridate)){
+  install.packages("lubridate", repos ="http://cran.us.r-project.org")
+  library(lubridate)
+}
+
+if(!require(nnet)){
+  install.packages("nnet", repos ="http://cran.us.r-project.org")
+  library(nnet)
+}
+
+```
+
+
+
+##Getting data
+We choose to download the zip file from github, as challengeTotvs.zip and unzip the content as sample.txt in the current directory.
+
+```{r}
+temp <- "./challengeTotvs.zip"
+
+fileURL = "https://github.com/TOTVS/MDMStatic/blob/master/code-challenge/TOTVS%20Labs%20-%20AI%20Challenge%20-%20Dataset.zip?raw=true"
+
+#download original file from github
+download.file(fileURL,destfile=temp, mode="wb")
+
+#unzip file sample.txt
+td <- tempdir()
+fname <- unzip(temp, list=TRUE)$Name[1]
+unzip(zipfile = temp, files=fname, exdir=td,overwrite=TRUE)
+
+#read the file sample.txt
+setwd(td)
+raw.data <- readLines("sample.txt", warn = "F")
+
+```
+
+##Parsing the data
+My choice was the jsonlite package to help our work in parsing the json code.
+
+```{r}
+rd <- fromJSON(raw.data)
+
+```
+
+##Exploring the data
+
+The records are structured in seven sections:
+- complemento (valorTotal)
+- dets (Detail about the operation)
+- emit (Data about the "Emitente")
+- ide (The operation and date)
+- infAdic (Complementary information about the operation)
+- total (Taxes)
+- versaoDocumento (Versioning of document/record json)
+
+
+According with the tests bellow, there is 1635 records in the document, and
+no null values in dataset.
+
+The histogram and boxplot make clear that most of the sales have total between
+30.98 and 120, but range from 9 until 608.
+
+
+```{r}
+# Document size / Number of records from file sample.txt 
+nrow(rd$ide)
+
+# Number of null values
+length(which(is.na(rd) == TRUE))
+
+#summary from valorTotal, in complemento section
+summary(rd$complemento)
+
+#Conversion necessary for plot a histogram
+rd$complemento <- data.matrix(rd$complemento)
+
+#Distribution of Totals Sales (rd$complemento)
+hist(rd$complemento)
+
+par(mfrow=c(1,2))
+
+#Resume about main statistics related to Totals (rd$complemento)
+boxplot(rd$complemento,ylab="Total Price",main= toupper("Totals - With outliers"),col=c("red"))
+
+boxplot(rd$complemento,ylab="Total Price",main= toupper("Totals - Without outliers"),col=c("blue"),outline=FALSE)
+```
+
+##Identify a pattern that can help predict how much a customer will spend.
+
+According the plots below, there is clearly a pattern about the quantity of sales and
+the day of the week.
+
+As example, you can see that in 2016-01-10 and 2016-01-17 there is no sales. Both dates are Sundays and maybe this is a behavior. Families would stay at home in Sundays.
+
+The sample is not so big because there is only 3 weeks in this dataset.
+
+```{r}
+qtdSalesByDay <- strptime(as.matrix(rd$ide[,1]),format = "%Y-%m-%d")
+tab <- table(cut(qtdSalesByDay, 'day'))
+tab2 <- table(cut(qtdSalesByDay, 'week'))
+
+barplot(tab, col=cm(5), las=3,main = "Qtd Sales by Date")
+
+barplot(tab2, col=cm(5), las=3,main = "Qtd Sales by Week")
+
+```
+
+Another thing that we can realize is that the probability that customer visit the restaurant its bigger between 12:00 and 14:00 (Lanch time) and between 20:00 and 22:00 (dinner), according the table below.
+
+Between 00:00 and 11:00 there is no customers. 
+
+```{r}
+qtdSalesByHour <- strptime(as.matrix(rd$ide[,1]),format = "%Y-%m-%dT%H:%M")
+count(hour(qtdSalesByHour))
+
+```
+
+We can apply this rules for try foresee customer visit based on day of the week and hour. 
+
+##Fitting Models
+
+We need predict how much a customer will spend then we need a regression algorithm.
+There is several options of machine learning for regression and supervised learning.
+
+Here we will try multiple linear regression and neural network.
+
+First place we tried with multiple linear regression.
+There is 3 variables that can explain how much will spend: 
+- the product price (vProd)
+- the quantity (it's a unity in KG or UN) (qCom)
+- the product (xProd)
+
+The product it's a categorical variable. Some products have more probability per example, BUFFET have the bigger probability of appear.
+
+```{r}
+#Create an unique data frame with the prods for help in linear regression and neural network
+x = 0
+
+#Create an unique data frame with the prods for help in linear regression and neural network
+for (obj in rd$dets){
+  if (x<1) {
+    dfProd <- obj$prod
+    x = 1
+    } else {
+    dfProd <- rbind(dfProd,obj$prod)
+  }
+}
+
+#First model, using regression 
+#vUnCom explained by qCom,vProd and xProd variables
+firstModel <- lm(vUnCom~qCom+vProd+xProd,dfProd)
+summary(firstModel)
+
+```
+
+The summary of this model show some good statistics about.
+Example:
+- R Squared near 1: 0.9778
+- Most of the coeficients showing *** (highly significant p-value)
+- t value far from 0 (Except BACARDI, EXPRESSO, DOCINHOS, HARUMAKI AND LIMONADA)
+
+
+Now, we will try with neural network
+
+```{r}
+secondModel <- nnet(vUnCom~qCom+vProd+xProd,data=dfProd,size=2)
+summary(secondModel)
+
+```
+
+##Mean squared error
+
+```{r}
+#Using multiple linear regression
+firstModel.predict <- predict(firstModel)
+                
+# mean squared error
+mean((firstModel.predict - dfProd$vUnCom)^2) 
+
+#Using neural network
+secondModel.predict <- predict(secondModel)
+                
+# mean squared error
+mean((secondModel.predict - dfProd$vUnCom)^2) 
+
+```
+
+##Sales forecast for the next week
+
+We have data about 3 weeks.
+
+Using linear regression it's possible to predicte the fourth week using the ammount of each week.
+```{r}
+
+#Building the dataframe
+day <- c(5,6,7,8,9,11,12,13,14,15,16,18,19,20,21,22)
+values = c()
+i = 1
+valueRestaurant = 0
+currentDate = substr(rd$ide[i,1]$`$date`,1,10)
+#summarize by day
+
+for (obj in rd$complemento){
+  if(substr(rd$ide[i,1]$`$date`,1,10) != currentDate)
+  {
+    values <- c(values,valueRestaurant)
+    valueRestaurant = 0
+    currentDate = substr(rd$ide[i,1]$`$date`,1,10)
+    
+  }
+  valueRestaurant = valueRestaurant + rd$complemento[i]
+  i = i+1
+}
+
+df <- data.frame(values,day)
+
+lm.fit <- lm(values~day,df)
+
+#Predicting the last week of January
+new.df <- data.frame(day=c(25,26,27,28,29,30))
+
+#Predict using the linear Model
+#Days 25 to 30 January. January, 31 it's Sunday then we consider 0 sales
+predict(lm.fit, new.df)
+
+```
+
+
+##Conclusion
+
+In this challenge, a dataset about customer's spend was analysed and some insights were discovered:
+- On Sundays, the sales is 0 showing that maybe families choose stay at home
+- The biggest spends can be observed on Lunch time or dinner time.
+- The ammount spended on restaurant can be explained by Quantity, Unity price and by products of type BUFEE (most expensive and most asked)
+- for predicting the last week, we used the ammount spent by day and considered 0 for Sundays.
+
+
+
