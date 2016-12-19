@@ -7,13 +7,13 @@ output: pdf_document
 
 ##Objective
 
-The objective of this challenge is using the given dataset of transactions (notas fiscais eletrônicas) from a restaurant:
+The objective of this challenge is using the given dataset of transactions (notas fiscais eletrônicas) from a restaurant:\newline
 
-1. Parse and extract the data.
+1. Parse and extract the data.\newline
 
-2. Identify a pattern on any set of fields that can help predict how much a customer will spend.
+2. Identify a pattern on any set of fields that can help predict how much a customer will spend.\newline
 
-3. Calculate a sales forecast for the next week.
+3. Calculate a sales forecast for the next week.\newline
 
 ##The environment
 It's important to pay atention to the environment, to make sure about reproducibility. 
@@ -82,14 +82,14 @@ rd <- fromJSON(raw.data)
 
 ##Exploring the data
 
-The records are structured in seven sections:
-- complemento (valorTotal)
-- dets (Detail about the operation)
-- emit (Data about the "Emitente")
-- ide (The operation and date)
-- infAdic (Complementary information about the operation)
-- total (Taxes)
-- versaoDocumento (Versioning of document/record json)
+The records are structured in seven sections:\newline
+- complemento (valorTotal)\newline
+- dets (Detail about the operation)\newline
+- emit (Data about the "Emitente")\newline
+- ide (The operation and date)\newline
+- infAdic (Complementary information about the operation)\newline
+- total (Taxes)\newline
+- versaoDocumento (Versioning of document/record json)\newline
 
 
 According with the tests bellow, there is 1635 records in the document, and
@@ -143,7 +143,7 @@ barplot(tab2, col=cm(5), las=3,main = "Qtd Sales by Week")
 
 ```
 
-Another thing that we can realize is that the probability that customer visit the restaurant its bigger between 12:00 and 14:00 (Lanch time) and between 20:00 and 22:00 (dinner), according the table below.
+Another thing that we can realize is the higher probability to have customer between 12:00 and 14:00 (Lunch time) and between 20:00 and 22:00 (dinner), according to the table below.
 
 Between 00:00 and 11:00 there is no customers. 
 
@@ -153,7 +153,7 @@ count(hour(qtdSalesByHour))
 
 ```
 
-We can apply this rules for try foresee customer visit based on day of the week and hour. 
+We can apply this rule to try foresee customer visit based on day of the week and hour. 
 
 ##Fitting Models
 
@@ -162,13 +162,13 @@ There is several options of machine learning for regression and supervised learn
 
 Here we will try multiple linear regression and neural network.
 
-First place we tried with multiple linear regression.
-There is 3 variables that can explain how much will spend: 
-- the product price (vProd)
-- the quantity (it's a unity in KG or UN) (qCom)
-- the product (xProd)
+Firstly we tried with multiple linear regression.
+There are 3 variables that can explain how much will be spent: 
+- the product price (vProd)\newline
+- the quantity (it's a unity in KG or UN) (qCom)\newline
+- the product (xProd)\newline
 
-The product it's a categorical variable. Some products have more probability per example, BUFFET have the bigger probability of appear.
+The product is a categorical variable. Some products have a higher probability of been consumed. BUFFET, per example, is high consumed product.
 
 ```{r}
 #Create an unique data frame with the prods for help in linear regression and neural network
@@ -193,9 +193,9 @@ summary(firstModel)
 
 The summary of this model show some good statistics about.
 Example:
-- R Squared near 1: 0.9778
-- Most of the coeficients showing *** (highly significant p-value)
-- t value far from 0 (Except BACARDI, EXPRESSO, DOCINHOS, HARUMAKI AND LIMONADA)
+- R Squared near 1: 0.9778 \newline
+- Most of the coeficients showing *** (highly significant p-value) \newline
+- t value far from 0 (Except BACARDI, EXPRESSO, DOCINHOS, HARUMAKI AND LIMONADA) \newline
 
 
 Now, we will try with neural network
@@ -227,7 +227,7 @@ mean((secondModel.predict - dfProd$vUnCom)^2)
 
 We have data about 3 weeks.
 
-Using linear regression it's possible to predicte the fourth week using the ammount of each week.
+Using linear regression is possible to predict the fourth week using the ammount of each week.
 ```{r}
 
 #Building the dataframe
@@ -266,11 +266,11 @@ predict(lm.fit, new.df)
 
 ##Conclusion
 
-In this challenge, a dataset about customer's spend was analysed and some insights were discovered:
-- On Sundays, the sales is 0 showing that maybe families choose stay at home
-- The biggest spends can be observed on Lunch time or dinner time.
-- The ammount spended on restaurant can be explained by Quantity, Unity price and by products of type BUFEE (most expensive and most asked)
-- for predicting the last week, we used the ammount spent by day and considered 0 for Sundays.
+In this challenge, a dataset about customer's spent was analysed and some insights were discovered:\newline
+- On Sundays, there were no sales, since families probably stay at home or in another event \newline
+- The highest consumption was observed in Lunch and dinner times. \newline
+- The ammount spent in restaurant can be explained by Quantity, Unity price and by  kind of product (BUFEET is more expensive and more consumed) \newline
+- for predicting the last week, we used the ammount spent by day and considered 0 for Sundays.\newline
 
 
 
